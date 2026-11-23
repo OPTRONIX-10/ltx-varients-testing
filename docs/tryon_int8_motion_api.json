@@ -1,0 +1,641 @@
+{
+ "unet": {
+  "class_type": "UNETLoader",
+  "inputs": {
+   "unet_name": "ltx-2.5-22b-distilled-transformer-comfy-int8-convrot.safetensors",
+   "weight_dtype": "default"
+  }
+ },
+ "clip": {
+  "class_type": "CLIPLoader",
+  "inputs": {
+   "clip_name": "gemma4-12b-with-proj-ltx-2.5-comfy-int8-convrot.safetensors",
+   "type": "ltxv",
+   "device": "default"
+  }
+ },
+ "vae": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "ltx-2.5-video-vae-bf16.safetensors"
+  }
+ },
+ "avae": {
+  "class_type": "VAELoader",
+  "inputs": {
+   "vae_name": "ltx-2.5-audio-vae-bf16.safetensors"
+  }
+ },
+ "ups": {
+  "class_type": "LatentUpscaleModelLoader",
+  "inputs": {
+   "model_name": "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"
+  }
+ },
+ "img_front": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "front.png"
+  }
+ },
+ "pre_front": {
+  "class_type": "LTXVPreprocess",
+  "inputs": {
+   "image": [
+    "img_front",
+    0
+   ],
+   "img_compression": 18
+  }
+ },
+ "img_back": {
+  "class_type": "LoadImage",
+  "inputs": {
+   "image": "back.png"
+  }
+ },
+ "pre_back": {
+  "class_type": "LTXVPreprocess",
+  "inputs": {
+   "image": [
+    "img_back",
+    0
+   ],
+   "img_compression": 18
+  }
+ },
+ "pos": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": "A fashion try-on video of the person from the reference photos, wearing exactly the same outfit, shoes and accessories with the same colours, fit, prints and details as in the photos. The person stands on the spot and turns a full 360 degrees in one smooth, continuous direction, the way a real model shows an outfit in a fitting room: starting facing the camera, turning to one side profile, then showing the full back of the outfit, then the other side profile, and finishing facing the camera again with a relaxed smile. Natural human movement with small pivoting steps and gentle weight shifts, arms relaxed at the sides, realistic fabric movement and folds. Static camera at chest height framing the whole body from head to shoes, soft even studio lighting, seamless light-grey backdrop, photorealistic.",
+   "clip": [
+    "clip",
+    0
+   ]
+  }
+ },
+ "neg": {
+  "class_type": "CLIPTextEncode",
+  "inputs": {
+   "text": "blurry, distorted body, extra limbs, morphing clothes, changing outfit, cut, zoom, camera shake",
+   "clip": [
+    "clip",
+    0
+   ]
+  }
+ },
+ "cond": {
+  "class_type": "LTXVConditioning",
+  "inputs": {
+   "positive": [
+    "pos",
+    0
+   ],
+   "negative": [
+    "neg",
+    0
+   ],
+   "frame_rate": 24.0
+  }
+ },
+ "noise": {
+  "class_type": "RandomNoise",
+  "inputs": {
+   "noise_seed": 42
+  }
+ },
+ "sampler": {
+  "class_type": "KSamplerSelect",
+  "inputs": {
+   "sampler_name": "euler_ancestral"
+  }
+ },
+ "empty": {
+  "class_type": "EmptyLTXVLatentVideo",
+  "inputs": {
+   "width": 384,
+   "height": 640,
+   "length": 121,
+   "batch_size": 1
+  }
+ },
+ "i2v_s1": {
+  "class_type": "LTXVImgToVideoInplace",
+  "inputs": {
+   "vae": [
+    "vae",
+    0
+   ],
+   "image": [
+    "pre_front",
+    0
+   ],
+   "latent": [
+    "empty",
+    0
+   ],
+   "strength": 1.0,
+   "bypass": false
+  }
+ },
+ "g_back_s1": {
+  "class_type": "LTXVAddGuide",
+  "inputs": {
+   "positive": [
+    "cond",
+    0
+   ],
+   "negative": [
+    "cond",
+    1
+   ],
+   "vae": [
+    "vae",
+    0
+   ],
+   "latent": [
+    "i2v_s1",
+    0
+   ],
+   "image": [
+    "pre_back",
+    0
+   ],
+   "frame_idx": 76,
+   "strength": 0.9
+  }
+ },
+ "g_end_s1": {
+  "class_type": "LTXVAddGuide",
+  "inputs": {
+   "positive": [
+    "g_back_s1",
+    0
+   ],
+   "negative": [
+    "g_back_s1",
+    1
+   ],
+   "vae": [
+    "vae",
+    0
+   ],
+   "latent": [
+    "g_back_s1",
+    2
+   ],
+   "image": [
+    "pre_front",
+    0
+   ],
+   "frame_idx": 120,
+   "strength": 0.9
+  }
+ },
+ "union": {
+  "class_type": "LTXICLoRALoaderModelOnly",
+  "inputs": {
+   "model": [
+    "unet",
+    0
+   ],
+   "lora_name": "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors",
+   "strength_model": 1.0
+  }
+ },
+ "motion_file": {
+  "class_type": "LoadVideo",
+  "inputs": {
+   "file": "motion_template.mp4"
+  }
+ },
+ "motion_vid": {
+  "class_type": "GetVideoComponents",
+  "inputs": {
+   "video": [
+    "motion_file",
+    0
+   ]
+  }
+ },
+ "motion_guide": {
+  "class_type": "LTXAddVideoICLoRAGuide",
+  "inputs": {
+   "positive": [
+    "g_end_s1",
+    0
+   ],
+   "negative": [
+    "g_end_s1",
+    1
+   ],
+   "vae": [
+    "vae",
+    0
+   ],
+   "latent": [
+    "g_end_s1",
+    2
+   ],
+   "image": [
+    "motion_vid",
+    0
+   ],
+   "frame_idx": 0,
+   "strength": 0.6,
+   "latent_downscale_factor": [
+    "union",
+    1
+   ],
+   "crop": "disabled",
+   "use_tiled_encode": false,
+   "tile_size": 256,
+   "tile_overlap": 64
+  }
+ },
+ "empty_audio": {
+  "class_type": "LTXVEmptyLatentAudio",
+  "inputs": {
+   "frames_number": 121,
+   "frame_rate": 24,
+   "batch_size": 1,
+   "audio_vae": [
+    "avae",
+    0
+   ]
+  }
+ },
+ "concat1": {
+  "class_type": "LTXVConcatAVLatent",
+  "inputs": {
+   "video_latent": [
+    "motion_guide",
+    2
+   ],
+   "audio_latent": [
+    "empty_audio",
+    0
+   ]
+  }
+ },
+ "guider1": {
+  "class_type": "CFGGuider",
+  "inputs": {
+   "model": [
+    "union",
+    0
+   ],
+   "positive": [
+    "motion_guide",
+    0
+   ],
+   "negative": [
+    "motion_guide",
+    1
+   ],
+   "cfg": 1.0
+  }
+ },
+ "sig1": {
+  "class_type": "ManualSigmas",
+  "inputs": {
+   "sigmas": "1.0, 0.99375, 0.9875, 0.98125, 0.975, 0.909375, 0.725, 0.421875, 0.0"
+  }
+ },
+ "sample1": {
+  "class_type": "SamplerCustomAdvanced",
+  "inputs": {
+   "noise": [
+    "noise",
+    0
+   ],
+   "guider": [
+    "guider1",
+    0
+   ],
+   "sampler": [
+    "sampler",
+    0
+   ],
+   "sigmas": [
+    "sig1",
+    0
+   ],
+   "latent_image": [
+    "concat1",
+    0
+   ]
+  }
+ },
+ "sep1": {
+  "class_type": "LTXVSeparateAVLatent",
+  "inputs": {
+   "av_latent": [
+    "sample1",
+    0
+   ]
+  }
+ },
+ "crop1": {
+  "class_type": "LTXVCropGuides",
+  "inputs": {
+   "positive": [
+    "motion_guide",
+    0
+   ],
+   "negative": [
+    "motion_guide",
+    1
+   ],
+   "latent": [
+    "sep1",
+    0
+   ]
+  }
+ },
+ "dec_ref": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "crop1",
+    2
+   ],
+   "vae": [
+    "vae",
+    0
+   ]
+  }
+ },
+ "upsample": {
+  "class_type": "LTXVLatentUpsampler",
+  "inputs": {
+   "samples": [
+    "crop1",
+    2
+   ],
+   "upscale_model": [
+    "ups",
+    0
+   ],
+   "vae": [
+    "vae",
+    0
+   ]
+  }
+ },
+ "iclora": {
+  "class_type": "LTXICLoRALoaderModelOnly",
+  "inputs": {
+   "model": [
+    "unet",
+    0
+   ],
+   "lora_name": "ltx-2.5-22b-ic-lora-pixel-spatial-upscaler-x2-1.0.safetensors",
+   "strength_model": 0.5
+  }
+ },
+ "i2v_s2": {
+  "class_type": "LTXVImgToVideoInplace",
+  "inputs": {
+   "vae": [
+    "vae",
+    0
+   ],
+   "image": [
+    "pre_front",
+    0
+   ],
+   "latent": [
+    "upsample",
+    0
+   ],
+   "strength": 1.0,
+   "bypass": false
+  }
+ },
+ "g_back_s2": {
+  "class_type": "LTXVAddGuide",
+  "inputs": {
+   "positive": [
+    "crop1",
+    0
+   ],
+   "negative": [
+    "crop1",
+    1
+   ],
+   "vae": [
+    "vae",
+    0
+   ],
+   "latent": [
+    "i2v_s2",
+    0
+   ],
+   "image": [
+    "pre_back",
+    0
+   ],
+   "frame_idx": 76,
+   "strength": 0.9
+  }
+ },
+ "g_end_s2": {
+  "class_type": "LTXVAddGuide",
+  "inputs": {
+   "positive": [
+    "g_back_s2",
+    0
+   ],
+   "negative": [
+    "g_back_s2",
+    1
+   ],
+   "vae": [
+    "vae",
+    0
+   ],
+   "latent": [
+    "g_back_s2",
+    2
+   ],
+   "image": [
+    "pre_front",
+    0
+   ],
+   "frame_idx": 120,
+   "strength": 0.9
+  }
+ },
+ "icguide": {
+  "class_type": "LTXAddVideoICLoRAGuide",
+  "inputs": {
+   "positive": [
+    "g_end_s2",
+    0
+   ],
+   "negative": [
+    "g_end_s2",
+    1
+   ],
+   "vae": [
+    "vae",
+    0
+   ],
+   "latent": [
+    "g_end_s2",
+    2
+   ],
+   "image": [
+    "dec_ref",
+    0
+   ],
+   "frame_idx": 0,
+   "strength": 1.0,
+   "latent_downscale_factor": [
+    "iclora",
+    1
+   ],
+   "crop": "disabled",
+   "use_tiled_encode": false,
+   "tile_size": 256,
+   "tile_overlap": 64
+  }
+ },
+ "concat2": {
+  "class_type": "LTXVConcatAVLatent",
+  "inputs": {
+   "video_latent": [
+    "icguide",
+    2
+   ],
+   "audio_latent": [
+    "sep1",
+    1
+   ]
+  }
+ },
+ "guider2": {
+  "class_type": "CFGGuider",
+  "inputs": {
+   "model": [
+    "iclora",
+    0
+   ],
+   "positive": [
+    "icguide",
+    0
+   ],
+   "negative": [
+    "icguide",
+    1
+   ],
+   "cfg": 1.0
+  }
+ },
+ "sig2": {
+  "class_type": "ManualSigmas",
+  "inputs": {
+   "sigmas": "0.909375, 0.725, 0.421875, 0.0"
+  }
+ },
+ "sample2": {
+  "class_type": "SamplerCustomAdvanced",
+  "inputs": {
+   "noise": [
+    "noise",
+    0
+   ],
+   "guider": [
+    "guider2",
+    0
+   ],
+   "sampler": [
+    "sampler",
+    0
+   ],
+   "sigmas": [
+    "sig2",
+    0
+   ],
+   "latent_image": [
+    "concat2",
+    0
+   ]
+  }
+ },
+ "sep2": {
+  "class_type": "LTXVSeparateAVLatent",
+  "inputs": {
+   "av_latent": [
+    "sample2",
+    0
+   ]
+  }
+ },
+ "crop2": {
+  "class_type": "LTXVCropGuides",
+  "inputs": {
+   "positive": [
+    "icguide",
+    0
+   ],
+   "negative": [
+    "icguide",
+    1
+   ],
+   "latent": [
+    "sep2",
+    0
+   ]
+  }
+ },
+ "decode": {
+  "class_type": "VAEDecode",
+  "inputs": {
+   "samples": [
+    "crop2",
+    2
+   ],
+   "vae": [
+    "vae",
+    0
+   ]
+  }
+ },
+ "crop_out": {
+  "class_type": "ImageCrop",
+  "inputs": {
+   "image": [
+    "decode",
+    0
+   ],
+   "width": 720,
+   "height": 1280,
+   "x": 24,
+   "y": 0
+  }
+ },
+ "video": {
+  "class_type": "CreateVideo",
+  "inputs": {
+   "images": [
+    "crop_out",
+    0
+   ],
+   "fps": 24.0
+  }
+ },
+ "save": {
+  "class_type": "SaveVideo",
+  "inputs": {
+   "video": [
+    "video",
+    0
+   ],
+   "filename_prefix": "tryon/out",
+   "format": "auto",
+   "codec": "auto"
+  }
+ }
+}

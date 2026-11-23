@@ -1,0 +1,25 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Your photos and reference clips stay local (only the instructions are committed)
+inputs/**
+!inputs/README.md
+
+# Benchmark outputs and logs
+results/
+logs/
+report/
+
+# Media and secrets, just in case
+*.mp4
+*.mov
+.env
+.env.*
